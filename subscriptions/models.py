@@ -3,6 +3,7 @@ from django.db import models
 from django.conf import settings
 from datetime import timedelta
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 
 class Plan(models.Model):
@@ -17,9 +18,11 @@ class Plan(models.Model):
     
 class Subscription(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscriptions")
-    plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name="subscriptions")
-    
-    
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="subscriptions")
+    price = models.DecimalField(
+    max_digits=10,
+    decimal_places=2
+)
     start_date = models.DateField(default=timezone.now)
     end_date = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
@@ -52,14 +55,16 @@ class Payment(models.Model):
     related_name="payments",
 )
     plan = models.ForeignKey(Plan, on_delete=models.PROTECT)
-    # subscription = models.ForeignKey(Subscription)
+    subscription = models.ForeignKey(Subscription,on_delete=models.SET_NULL, null=True, blank=True, related_name="payments",)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING,)
     tracking_code = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def clean(self):
+        if self.subscription and self.subscription.user_id != self.user_id:
+            raise ValidationError("The subscription does not belong to the user.")
+
     def __str__(self):
         return f"{self.user} - {self.amount} - {self.status}"
-
-    
     
