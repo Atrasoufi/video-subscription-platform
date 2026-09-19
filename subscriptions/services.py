@@ -1,7 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
 from django.db import transaction
-from .models import Subscription, Plan
+from .models import Subscription
 
 
 class SubscriptionError(Exception):
@@ -19,18 +19,16 @@ def create_user_subscription(user, plan):
     
     
     
-    start_date = timezone.now()
-    end = start_date + timedelta(days=plan.duration_days)
+    start_date = timezone.now().date()
+    end_date = start_date + timedelta(days=plan.duration_days)
     
     subscription = Subscription.objects.create(
         user=user,
         plan=plan,
-        price=plan.price, 
-        duration_days=plan.duration_days,
+        price=plan.price,
         start_date=start_date,
-        end_date=end,
+        end_date=end_date,
         is_active=True,
     )
+
     return subscription
-    
-    
