@@ -26,6 +26,7 @@ def create_user_subscription(user, plan):
         user=user,
         plan=plan,
         price=plan.price,
+        duration_days = plan.duratioin.days,
         start_date=start_date,
         end_date=end_date,
         is_active=True,
