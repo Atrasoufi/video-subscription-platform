@@ -9,22 +9,11 @@ from .serializers import (
     WatchHistorySerializer,
     WatchHistoryCreateSerializer,
 )
+from .services import broadcast_video_update
 from subscriptions.permissions import HasActiveSubscription
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-
-
-class IsAdminOrReadOnly(permissions.BasePermission):
-   
-
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return request.user and request.user.is_staff
 
 
 class VideoViewSet(viewsets.ModelViewSet):
-
     queryset = Video.objects.select_related('uploader').all()
 
     def get_serializer_class(self):
@@ -66,6 +55,14 @@ class VideoViewSet(viewsets.ModelViewSet):
                 'is_completed': serializer.validated_data['is_completed'],
             }
         )
+
+        # Broadcast live update to all connected WebSocket clients
+        broadcast_video_update(
+            video_id=video.id,
+            user_email=request.user.email,
+            progress=history.progress,
+        )
+
         return Response(
             WatchHistorySerializer(history).data,
             status=status.HTTP_200_OK
@@ -73,7 +70,6 @@ class VideoViewSet(viewsets.ModelViewSet):
 
 
 class WatchHistoryViewSet(viewsets.ModelViewSet):
- 
     serializer_class = WatchHistorySerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -98,20 +94,3 @@ class WatchHistoryViewSet(viewsets.ModelViewSet):
             defaults={'progress': progress, 'is_completed': is_completed}
         )
         serializer.instance = history
-        
-        
-    def broadcast_video_update(video_id, user_email, progress):
-            
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'video_updates',
-                {
-                    'type': 'video_update',
-                    'data': {
-                        'event': 'watch_progress',
-                        'video_id': video_id,
-                        'user': user_email,
-                        'progress': progress,
-                    }
-                }
-            )
