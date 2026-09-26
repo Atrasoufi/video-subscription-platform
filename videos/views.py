@@ -10,6 +10,8 @@ from .serializers import (
     WatchHistoryCreateSerializer,
 )
 from subscriptions.permissions import HasActiveSubscription
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 
 class IsAdminOrReadOnly(permissions.BasePermission):
@@ -96,3 +98,20 @@ class WatchHistoryViewSet(viewsets.ModelViewSet):
             defaults={'progress': progress, 'is_completed': is_completed}
         )
         serializer.instance = history
+        
+        
+    def broadcast_video_update(video_id, user_email, progress):
+            
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'video_updates',
+                {
+                    'type': 'video_update',
+                    'data': {
+                        'event': 'watch_progress',
+                        'video_id': video_id,
+                        'user': user_email,
+                        'progress': progress,
+                    }
+                }
+            )
